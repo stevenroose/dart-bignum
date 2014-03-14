@@ -114,7 +114,7 @@ class Montgomery {
       var u0 = (j*this.mpl+(((j*this.mph+(x_array[i]>>15)*this.mpl)&this.um)<<15))&BigInteger.BI_DM;
       // use am to combine the multiply-shift-add into one call
       j = i+this.m.t;
-      x_array[j] += this.m.am(0,u0,x,i,0,this.m.t);
+      x_array[j] += this.m.am(0,u0,x,i,0,this.m.t,this.m.array);
       // propagate carry
       while(x_array[j] >= BigInteger.BI_DV) {
         x_array[j] -= BigInteger.BI_DV;
@@ -281,12 +281,15 @@ class BigInteger {
   // Basic dart BN library - subset useful for RSA encryption.
 
   /** [List] of low primes */
-  List<int> _lowprimes;
-  int _lplim;
+  static final List<int> _lowprimes = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113,127,131,137,139,149,151,157,163,167,173,179,181,191,193,197,199,211,223,227,229,233,239,241,251,257,263,269,271,277,281,283,293,307,311,313,317,331,337,347,349,353,359,367,373,379,383,389,397,401,409,419,421,431,433,439,443,449,457,461,463,467,479,487,491,499,503,509];
+  static final int _lplim = (1 << 26) ~/ _lowprimes[_lowprimes.length-1];
 
   /** JavaScript engine analysis */
-  int canary = 0xdeadbeefcafe;
-  bool _j_lm;
+  static final int canary = 0xdeadbeefcafe;
+  static final bool _j_lm = ((canary & 0xffffff) == 0xefcafe); // TODO appears to be unused
+  
+  static var BI_RM = "0123456789abcdefghijklmnopqrstuvwxyz";
+  static Map BI_RC;
 
   /**
    * Internal data structure of [BigInteger] implementation.
@@ -294,9 +297,6 @@ class BigInteger {
   JSArray<int> array;
 
   Function am;
-
-  var BI_RM = "0123456789abcdefghijklmnopqrstuvwxyz";
-  Map BI_RC;
 
   int t;
   var s;
@@ -335,15 +335,12 @@ class BigInteger {
    *    x.toString() == "beef";
    */
   BigInteger([a,b,c]) { // TODO: create mutiple constructors, instead of constructing based on the dynamimc type
-    _lowprimes = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113,127,131,137,139,149,151,157,163,167,173,179,181,191,193,197,199,211,223,227,229,233,239,241,251,257,263,269,271,277,281,283,293,307,311,313,317,331,337,347,349,353,359,367,373,379,383,389,397,401,409,419,421,431,433,439,443,449,457,461,463,467,479,487,491,499,503,509];
-    BI_RC = new Map();
-    _j_lm = ((canary&0xffffff)==0xefcafe);
     // Setup all the global scope js code here
     _setupDigitConversions();
-    _lplim = (1<<26)~/_lowprimes[_lowprimes.length-1];
     //am3 works better on x64, while am3 is faster on 32-bit platforms.
     //_setupEngine(_am4, 26);
     _setupEngine(_am3, 28);
+    this.am = _am3;
     this.array = new JSArray<int>();
 
     if (a != null) {
@@ -378,8 +375,8 @@ class BigInteger {
    * Alternately, set max digit bits to 28 since some
    * browsers slow down when dealing with 32-bit numbers.
    */
-  _am3(i,x,w,j,c,n) {
-    var this_array = this.array;
+  static _am3(i,x,w,j,c,n,array) {
+    var this_array = array;
     var w_array    = w.array;
     var xl = x.toInt() & 0x3fff, xh = x.toInt() >> 14;
     while(--n >= 0) {
@@ -393,8 +390,8 @@ class BigInteger {
     return c;
   }
 
-  _am4(i,x,w,j,c,n) {
-    var this_array = this.array;
+  static _am4(i,x,w,j,c,n,array) {
+    var this_array = array;
     var w_array    = w.array;
 
     var xl = x.toInt()&0x1fff, xh = x.toInt()>>13;
@@ -415,8 +412,7 @@ class BigInteger {
    * IE7 does 9% better with am3/28 than with am4/26.
    * Firefox (SM) gets 10% faster with am3/28 than with am4/26.
    */
-  _setupEngine(Function fn, int bits) {
-    this.am = fn;
+  static _setupEngine(Function fn, int bits) {
     dbits = bits;
 
     BI_DB = dbits;
@@ -430,7 +426,7 @@ class BigInteger {
   }
 
   /** Digit conversions */
-  _setupDigitConversions() {
+  static _setupDigitConversions() {
     // Digit conversions
     BI_RM = "0123456789abcdefghijklmnopqrstuvwxyz";
     BI_RC = new Map();
@@ -753,7 +749,7 @@ class BigInteger {
     var i = x.t;
     r.t = i+y.t;
     while(--i >= 0) r_array[i] = 0;
-    for(i = 0; i < y.t; ++i) r_array[i+x.t] = x.am(0,y_array[i],r,i,0,x.t);
+    for(i = 0; i < y.t; ++i) r_array[i+x.t] = x.am(0,y_array[i],r,i,0,x.t,x.array);
     r.s = 0;
     r.clamp();
 
@@ -772,13 +768,13 @@ class BigInteger {
     var i = r.t = 2*x.t;
     while(--i >= 0) r_array[i] = 0;
     for(i = 0; i < x.t-1; ++i) {
-      var c = x.am(i,x_array[i],r,2*i,0,1);
-      if((r_array[i+x.t]+=x.am(i+1,2*x_array[i],r,2*i+1,c,x.t-i-1)) >= BI_DV) {
+      var c = x.am(i,x_array[i],r,2*i,0,1,x.array);
+      if((r_array[i+x.t]+=x.am(i+1,2*x_array[i],r,2*i+1,c,x.t-i-1,x.array)) >= BI_DV) {
         r_array[i+x.t] -= BI_DV;
         r_array[i+x.t+1] = 1;
       }
     }
-    if(r.t > 0) r_array[r.t-1] += x.am(i,x_array[i],r,2*i,0,1);
+    if(r.t > 0) r_array[r.t-1] += x.am(i,x_array[i],r,2*i,0,1,x.array);
     r.s = 0;
     r.clamp();
   }
@@ -826,7 +822,7 @@ class BigInteger {
     while(--j >= 0) {
       // Estimate quotient digit
       var qd = (r_array[--i]==y0)?BI_DM:(r_array[i]*d1+(r_array[i-1]+e)*d2).floor();
-      if((r_array[i]+=y.am(0,qd,r,j,0,ys)) < qd) {  // Try it out
+      if((r_array[i]+=y.am(0,qd,r,j,0,ys,y.array)) < qd) {  // Try it out
         y.dlShiftTo(j,t);
         r.subTo(t,r);
         while(r_array[i] < --qd) r.subTo(t,r);
@@ -1353,7 +1349,7 @@ class BigInteger {
   /** this *= n, this >= 0, 1 < n < [BI_DV] */
   dMultiply(n) {
     var this_array = this.array;
-    this_array[this.t] = this.am(0,n-1,this,0,0,this.t);
+    this_array[this.t] = this.am(0,n-1,this,0,0,this.t,this.array);
     ++this.t;
     this.clamp();
   }
@@ -1388,8 +1384,8 @@ class BigInteger {
     r.t = i;
     while(i > 0) r_array[--i] = 0;
     var j;
-    for(j = r.t-this.t; i < j; ++i) r_array[i+this.t] = this.am(0,a_array[i],r,i,0,this.t);
-    for(j = Mathx.min(a.t,n); i < j; ++i) this.am(0,a_array[i],r,i,0,n-i);
+    for(j = r.t-this.t; i < j; ++i) r_array[i+this.t] = this.am(0,a_array[i],r,i,0,this.t,this.array);
+    for(j = Mathx.min(a.t,n); i < j; ++i) this.am(0,a_array[i],r,i,0,n-i,this.array);
     r.clamp();
   }
 
@@ -1405,7 +1401,7 @@ class BigInteger {
     r.s = 0; // assumes a,this >= 0
     while(--i >= 0) r_array[i] = 0;
     for(i = Mathx.max(n-this.t,0); i < a.t; ++i) {
-      r_array[this.t+i-n] = this.am(n-i,a_array[i],r,0,0,this.t+i-n);
+      r_array[this.t+i-n] = this.am(n-i,a_array[i],r,0,0,this.t+i-n,this.array);
     }
     r.clamp();
     r.drShiftTo(1,r);
