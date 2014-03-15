@@ -44,14 +44,14 @@ class Classic {
 
   Classic(this.m);
   convert(x) {
-    if(x.s < 0 || x.compareTo(this.m) >= 0) { return x.mod(this.m);
+    if(x.sxxxxx < 0 || x.compareTo(this.m) >= 0) { return x.mod(this.m);
     } else { return x;
     }
   }
   revert(x) { return x; }
-  reduce(x) { x.divRemTo(this.m,null,x); }
-  mulTo(x,y,r) { x.multiplyTo(y,r); this.reduce(r); }
-  sqrTo(x,r) { x.squareTo(r); this.reduce(r); }
+  reduce(x) { return x._divRemTo(this.m,null,x).r; }
+  mulTo(x,y,r) { r = x._multiplyTo(y,r); return this.reduce(r); }
+  sqrTo(x,r) { r = x._squareTo(r); return this.reduce(r); }
 }
 
 /**
@@ -71,21 +71,21 @@ class Montgomery {
    * Montgomery reduction
    */
   Montgomery(this.m) {
-  this.mp = m.invDigit();
+  this.mp = m._invDigit();
   this.mpl = this.mp&0x7fff;
   this.mph = this.mp>>15;
   this.um = (1<<(BigInteger.BI_DB-15))-1;
-  this.mt2 = 2*m.t;
+  this.mt2 = 2*m.txxxxx;
   }
 
   /**
    * xR mod m
    */
   BigInteger convert(BigInteger x) {
-    var r = BigInteger.nbi();
-    x.abs().dlShiftTo(this.m.t,r);
-    r.divRemTo(this.m,null,r);
-    if(x.s < 0 && r.compareTo(BigInteger.ZERO) > 0) this.m.subTo(r,r);
+    var r = BigInteger._nbi();
+    r = x.abs()._dlShiftTo(this.m.txxxxx,r);
+    r = r._divRemTo(this.m,null,r).r;
+    if(x.sxxxxx < 0 && r.compareTo(BigInteger.ZERO) > 0) r = this.m._subTo(r,r);
     return r;
   }
 
@@ -93,36 +93,36 @@ class Montgomery {
    * x/R mod m
    */
   BigInteger revert(BigInteger x) {
-    var r = BigInteger.nbi();
-    x.copyTo(r);
-    this.reduce(r);
-    return r;
+    var r = BigInteger._nbi();
+    r = x.copy();
+    return this.reduce(r);
   }
 
   /**
    * x = x/R mod m (HAC 14.32)
    */
-  void reduce(x) {
-    var x_array = x.array;
-    while(x.t <= this.mt2) { // pad x so am has enough room later
-      x_array[x.t++] = 0;
+  BigInteger reduce(x) {
+    var x_array = x.arrayxxxxx;
+    var x_t = x.txxxxx;
+    while(x_t <= this.mt2) { // pad x so am has enough room later
+      x_array[x_t++] = 0;
     }
 
-    for(var i = 0; i < this.m.t; ++i) {
+    for(var i = 0; i < this.m.txxxxx; ++i) {
       // faster way of calculating u0 = x[i]*mp mod DV
       var j = x_array[i]&0x7fff;
       var u0 = (j*this.mpl+(((j*this.mph+(x_array[i]>>15)*this.mpl)&this.um)<<15))&BigInteger.BI_DM;
       // use am to combine the multiply-shift-add into one call
-      j = i+this.m.t;
-      x_array[j] += this.m.am(0,u0,x,i,0,this.m.t,this.m.array);
+      j = i+this.m.txxxxx;
+      x_array[j] += this.m.amxxxxx(0,u0,x,i,0,this.m.txxxxx,this.m.arrayxxxxx);
       // propagate carry
       while(x_array[j] >= BigInteger.BI_DV) {
         x_array[j] -= BigInteger.BI_DV;
         x_array[++j]++;
       }
     }
-    x.clamp();
-    x.drShiftTo(this.m.t,x);
+    x_t = BigInteger.clamp(x_t, x_array, x.sxxxxx);
+    x.drShiftTo(this.m.txxxxx,x);//TODO <- here was I
     if(x.compareTo(this.m) >= 0) {
       x.subTo(this.m,x);
     }
@@ -160,20 +160,20 @@ class Barrett {
    */
   Barrett(this.m) {
     // setup Barrett
-    this.r2 = BigInteger.nbi();
-    this.q3 = BigInteger.nbi();
-    BigInteger.ONE.dlShiftTo(2*m.t,this.r2);
+    this.r2 = BigInteger._nbi();
+    this.q3 = BigInteger._nbi();
+    BigInteger.ONE.dlShiftTo(2*m.txxxxx,this.r2);
     this.mu = this.r2.divide(m);
 
   }
 
   BigInteger convert(BigInteger x) {
-    if(x.s < 0 || x.t > 2*this.m.t)  {
+    if(x.sxxxxx < 0 || x.txxxxx > 2*this.m.txxxxx)  {
       return x.mod(this.m);
     } else if(x.compareTo(this.m) < 0) {
       return x;
     } else {
-      var r = BigInteger.nbi();
+      var r = BigInteger._nbi();
       x.copyTo(r);
       this.reduce(r);
       return r;
@@ -188,16 +188,16 @@ class Barrett {
    * x = x mod m (HAC 14.42)
    */
   void reduce(BigInteger x) {
-    x.drShiftTo(this.m.t - 1, this.r2);
-    if(x.t > this.m.t+1) {
-      x.t = this.m.t+1;
+    x.drShiftTo(this.m.txxxxx - 1, this.r2);
+    if(x.txxxxx > this.m.txxxxx+1) {
+      x.txxxxx = this.m.txxxxx+1;
       x.clamp();
     }
 
-    this.mu.multiplyUpperTo(this.r2, this.m.t + 1, this.q3);
-    this.m.multiplyLowerTo(this.q3, this.m.t + 1, this.r2);
+    this.mu.multiplyUpperTo(this.r2, this.m.txxxxx + 1, this.q3);
+    this.m.multiplyLowerTo(this.q3, this.m.txxxxx + 1, this.r2);
     while(x.compareTo(this.r2) < 0) {
-      x.dAddOffset(1,this.m.t+1);
+      x.dAddOffset(1,this.m.txxxxx+1);
     }
 
     x.subTo(this.r2,x);
@@ -246,6 +246,15 @@ class JSArray<T> {
   }
 
   List<T> data = new List<T>();
+  
+  @override
+  String toString() => data.toString();
+}
+
+class _QuotRem {
+  final BigInteger q;
+  final BigInteger r;
+  _QuotRem(this.q, this.r);
 }
 
 /**
@@ -265,10 +274,11 @@ class BigInteger {
   static int BI_F2;
 
   /** Create a new [BigInteger] */
-  static BigInteger nbi() { return new BigInteger(null, null, null); }
+  static BigInteger _nbi() => 
+      new BigInteger._internal(_initArray, _am3, null, null);
   /** return [BigInteger] initialized to [i] */
   static BigInteger nbv(int i) {
-    var r = nbi();
+    var r = _nbi();
     r.fromInt(i);
     return r;
   }
@@ -285,21 +295,23 @@ class BigInteger {
   static final int _lplim = (1 << 26) ~/ _lowprimes[_lowprimes.length-1];
 
   /** JavaScript engine analysis */
-  static final int canary = 0xdeadbeefcafe;
-  static final bool _j_lm = ((canary & 0xffffff) == 0xefcafe); // TODO appears to be unused
+  // commented because unused
+  //static final int canary = 0xdeadbeefcafe;
+  //static final bool _j_lm = ((canary & 0xffffff) == 0xefcafe);
   
-  static var BI_RM = "0123456789abcdefghijklmnopqrstuvwxyz";
+  static final BI_RM = "0123456789abcdefghijklmnopqrstuvwxyz";
   static Map BI_RC;
 
   /**
    * Internal data structure of [BigInteger] implementation.
    */
-  JSArray<int> array;
+  final JSArray<int> arrayxxxxx;
+  static JSArray<int> get _initArray => new JSArray<int>();
 
-  Function am;
+  final Function amxxxxx;
 
-  int t;
-  var s;
+  final int txxxxx;
+  final int sxxxxx;
 
   /**
    * Constructor of [BigInteger]
@@ -334,29 +346,26 @@ class BigInteger {
    *    var x = new BigInteger(s);
    *    x.toString() == "beef";
    */
-  BigInteger([a,b,c]) { // TODO: create mutiple constructors, instead of constructing based on the dynamimc type
-    // Setup all the global scope js code here
-    _setupDigitConversions();
-    //am3 works better on x64, while am3 is faster on 32-bit platforms.
-    //_setupEngine(_am4, 26);
-    _setupEngine(_am3, 28);
-    this.am = _am3;
-    this.array = new JSArray<int>();
-
-    if (a != null) {
-      if (a is int) {
-        // this.fromNumber(a,b,c);
-        // NOTE: the fromNumber implementation trys to exploit js numbers
-        this.fromString(a.toString(), 10);
-      } else if (a is num) {
-        this.fromString(a.toInt().toString(), 10);
-      } else if (b == null && a is! String) {
-        this.fromString(a,256);
-      } else {
-        this.fromString(a,b);
-      }
+  factory BigInteger([a,b,c]) { // TODO: create mutiple constructors, instead of constructing based on the dynamimc type
+    if (a == null)
+      throw new ArgumentError("The first argument must not be null.");
+    if (a is int) {
+      // this.fromNumber(a,b,c);
+      // NOTE: the fromNumber implementation trys to exploit js numbers
+      return new BigInteger.fromString(a.toString(), 10);
+    } else if (a is num) {
+      return new BigInteger.fromString(a.toInt().toString(), 10);
+    } else if (b == null && a is! String) {
+      return new BigInteger.fromString(a, 256);
+    } else {
+      return new BigInteger.fromString(a, b);
     }
   }
+  
+  const BigInteger._internal(this.arrayxxxxx, this.amxxxxx, this.txxxxx, this.sxxxxx);
+  // shorter
+  static BigInteger _newInst(array, am, t, s) => 
+      new BigInteger._internal(array, am, t, s);
 
   factory BigInteger.fromBytes( int signum, List<int> magnitude ) {
     if( signum==0 ) throw new ArgumentError("Argument signum must not be zero");
@@ -370,6 +379,8 @@ class BigInteger {
     var self = new BigInteger(magnitude);
     return (signum<0) ? -self : self;
   }
+  
+  static var _default_am = _am3;
 
   /**
    * Alternately, set max digit bits to 28 since some
@@ -377,7 +388,7 @@ class BigInteger {
    */
   static _am3(i,x,w,j,c,n,array) {
     var this_array = array;
-    var w_array    = w.array;
+    var w_array    = w.arrayxxxxx;
     var xl = x.toInt() & 0x3fff, xh = x.toInt() >> 14;
     while(--n >= 0) {
       var l = this_array[i]&0x3fff;
@@ -392,8 +403,7 @@ class BigInteger {
 
   static _am4(i,x,w,j,c,n,array) {
     var this_array = array;
-    var w_array    = w.array;
-
+    var w_array    = w.arrayxxxxx;
     var xl = x.toInt()&0x1fff, xh = x.toInt()>>13;
     while(--n >= 0) {
       var l = this_array[i]&0x1fff;
@@ -404,6 +414,14 @@ class BigInteger {
       w_array[j++] = l&0x3ffffff;
     }
     return c;
+  }
+  
+  static _setup(am) {
+    // Setup all the global scope js code here
+    _setupDigitConversions();
+    //am3 works better on x64, while am3 is faster on 32-bit platforms.
+    //_setupEngine(_am4, 26)
+    _setupEngine(am, 28);
   }
 
   /**
@@ -428,7 +446,7 @@ class BigInteger {
   /** Digit conversions */
   static _setupDigitConversions() {
     // Digit conversions
-    BI_RM = "0123456789abcdefghijklmnopqrstuvwxyz";
+    //BI_RM = "0123456789abcdefghijklmnopqrstuvwxyz";
     BI_RC = new Map();
     int rr, vv;
     rr = "0".codeUnitAt(0);
@@ -439,39 +457,54 @@ class BigInteger {
     for(vv = 10; vv < 36; ++vv) BI_RC[rr++] = vv;
   }
 
-  _int2char(n) {
+  static _int2char(n) {
     return BI_RM[n];
   }
 
-  _intAt(s,i) {
+  static _intAt(s,i) {
     var c = BI_RC[s.codeUnitAt(i)];
     return (c==null)?-1:c;
   }
 
   /** copy [this] to [r] */
   void copyTo(BigInteger r) {
-    var this_array = this.array;
-    var r_array    = r.array;
+    var this_array = this.arrayxxxxx;
+    var r_array    = r.arrayxxxxx;
 
-    for(var i = this.t-1; i >= 0; --i) r_array[i] = this_array[i];
-    r.t = this.t;
-    r.s = this.s;
+    for(var i = this.txxxxx-1; i >= 0; --i) r_array[i] = this_array[i];
+    r.txxxxx = this.txxxxx;
+    r.sxxxxx = this.sxxxxx;
+  }
+  
+  BigInteger copy() {
+    var this_array = this.arrayxxxxx;
+    var n_array = _initArray;
+    for(var i = this.txxxxx-1; i >= 0; --i) n_array[i] = this_array[i];
+    return _newInst(n_array, this.amxxxxx, this.txxxxx, this.sxxxxx);
   }
 
   /** set from integer value [x], -[BI_DV] <= [x] < [BI_DV] */
-  void fromInt(int x) {
-    var this_array = this.array;
-    this.t = 1;
-    this.s = (x<0)?-1:0;
-    if(x > 0) { this_array[0] = x;
-    } else if(x < -1) { this_array[0] = x+BI_DV;
-    } else { this.t = 0;
-    }
+  factory BigInteger.fromInt(int x) {
+    var this_array = _initArray;
+    var this_am = _default_am;
+    _setup(this_am);
+    var this_t = 1;
+    var this_s = (x<0)?-1:0;
+    if(x > 0)
+      this_array[0] = x;
+    else if(x < -1)
+      this_array[0] = x+BI_DV;
+    else
+      this_t = 0;
+    return _newInst(this_array, this_am, this_t, this_s);
   }
 
   /** set from string [s] and radix [b] */
-  void fromString(s, int b) {
-    var this_array = this.array;
+  // it seems that s can also be a byte list (like Uint8List)
+  factory BigInteger.fromString(s, int b) {
+    var this_array = _initArray;
+    var this_am = _default_am;
+    _setup(this_am);
     var k;
     if(b == 16) { k = 4;
     } else if(b == 8) { k = 3;
@@ -479,9 +512,9 @@ class BigInteger {
     } else if(b == 2) { k = 1;
     } else if(b == 32) { k = 5;
     } else if(b == 4) { k = 2;
-    } else { this.fromRadix(s,b); return; }
-    this.t = 0;
-    this.s = 0;
+    } else { return fromRadix(s,b); }
+    var this_txxxxx = 0;
+    var this_sxxxxx = 0;
     var i = s.length, mi = false, sh = 0;
     while(--i >= 0) {
       var x = (k==8) ? s[i] & 0xff : _intAt(s,i); // if k==8 its a byte array
@@ -492,29 +525,29 @@ class BigInteger {
       }
       mi = false;
       if(sh == 0) {
-        this_array[this.t++] = x;
+        this_array[this_txxxxx++] = x;
       } else if(sh+k > BI_DB) {
-        this_array[this.t-1] |= (x&((1<<(BI_DB-sh))-1))<<sh;
-        this_array[this.t++] = (x>>(BI_DB-sh));
+        this_array[this_txxxxx-1] |= (x&((1<<(BI_DB-sh))-1))<<sh;
+        this_array[this_txxxxx++] = (x>>(BI_DB-sh));
       }
       else {
-        this_array[this.t-1] |= x<<sh;
+        this_array[this_txxxxx-1] |= x<<sh;
       }
       sh += k;
       if(sh >= BI_DB) sh -= BI_DB;
     }
     if(k == 8 && (s[0]&0x80) != 0) {
-      this.s = -1;
-      if(sh > 0) this_array[this.t-1] |= ((1<<(BI_DB-sh))-1)<<sh;
+      this_sxxxxx = -1;
+      if(sh > 0) this_array[this_txxxxx-1] |= ((1<<(BI_DB-sh))-1)<<sh;
     }
-    this.clamp();
+    this_txxxxx = clamp(this_txxxxx, this_array, this_sxxxxx);
     if(mi) BigInteger.ZERO.subTo(this,this);
   }
 
   /** return string representation in given radix [b] */
   String toString([int b]) { // NOTE: overriding toString like this is probably bad.
-    var this_array = this.array;
-    if(this.s < 0) {
+    var this_array = this.arrayxxxxx;
+    if(this.sxxxxx < 0) {
       return "-${this.negate_op().toString(b)}"; //return "-"+this.negate().toString(b);
     }
 
@@ -526,7 +559,7 @@ class BigInteger {
     } else if(b == 4) { k = 2;
     } else { return this.toRadix(b);
     }
-    var km = (1<<k)-1, d, m = false, r = "", i = this.t;
+    var km = (1<<k)-1, d, m = false, r = "", i = this.txxxxx;
     var p = BI_DB-(i*BI_DB)%k;
     if(i-- > 0) {
       if(p < BI_DB && (d = this_array[i]>>p) > 0) { m = true; r = _int2char(d); }
@@ -547,15 +580,15 @@ class BigInteger {
   }
 
   /** -this */
-  negate_op() {
-    var r = nbi();
+  BigInteger negate_op() {
+    var r = _nbi();
     BigInteger.ZERO.subTo(this,r);
     return r;
   }
 
   /** |this| */
   BigInteger abs() {
-    return (this.s<0)?this.negate_op():this;
+    return (this.sxxxxx<0)?this.negate_op():this;
   }
 
   /** return + if [this] > [a], - if [this] < [a], 0 if equal **/
@@ -563,13 +596,13 @@ class BigInteger {
     if( a is num ) {
       a = new BigInteger(a);
     }
-    var this_array = this.array;
-    var a_array = a.array;
+    var this_array = this.arrayxxxxx;
+    var a_array = a.arrayxxxxx;
 
-    var r = this.s-a.s;
+    var r = this.sxxxxx-a.sxxxxx;
     if(r != 0) return r;
-    var i = this.t;
-    r = i-a.t;
+    var i = this.txxxxx;
+    r = i-a.txxxxx;
     if(r != 0) return r;
     while(--i >= 0) if((r=this_array[i]-a_array[i]) != 0) return r;
     return 0;
@@ -591,96 +624,158 @@ class BigInteger {
 
   /** return the number of bits in [this] */
   int bitLength() {
-    var this_array = this.array;
-    if(this.t <= 0) return 0;
-    return BI_DB*(this.t-1)+nbits(this_array[this.t-1]^(this.s&BI_DM));
+    var this_array = this.arrayxxxxx;
+    if(this.txxxxx <= 0) return 0;
+    return BI_DB*(this.txxxxx-1)+nbits(this_array[this.txxxxx-1]^(this.sxxxxx&BI_DM));
+  }
+  
+  static String _dump_state(a) {
+    return "t=${a.txxxxx}, s=${a.sxxxxx}, array = ${a.arrayxxxxx}";
   }
 
   /** r = this << n*DB */
   void dlShiftTo(n,r) {
-    var this_array = this.array;
-    var r_array = r.array;
+    var this_array = this.arrayxxxxx;
+    var r_array = r.arrayxxxxx;
     var i;
-    for(i = this.t-1; i >= 0; --i) r_array[i+n] = this_array[i];
+    for(i = this.txxxxx-1; i >= 0; --i) r_array[i+n] = this_array[i];
     for(i = n-1; i >= 0; --i) r_array[i] = 0;
-    r.t = this.t+n;
-    r.s = this.s;
+    r.txxxxx = this.txxxxx+n;
+    r.sxxxxx = this.sxxxxx;
+  }
+  
+  BigInteger _dlShiftTo(n,r) {
+    var this_array = this.arrayxxxxx;
+    var n_array = r.arrayxxxxx;
+    var i;
+    for(i = this.txxxxx-1; i >= 0; --i) n_array[i+n] = this_array[i];
+    for(i = n-1; i >= 0; --i) n_array[i] = 0;
+    return _newInst(n_array, this.amxxxxx, this.txxxxx + 1, this.sxxxxx);
   }
 
   /** r = this >> n*DB */
   void drShiftTo(n,r) {
-    var this_array = this.array;
-    var r_array = r.array;
-    for(var i = n; i < this.t; ++i) r_array[i-n] = this_array[i];
-    r.t = Mathx.max(this.t-n,0);
-    r.s = this.s;
+    var this_array = this.arrayxxxxx;
+    var r_array = r.arrayxxxxx;
+    for(var i = n; i < this.txxxxx; ++i) r_array[i-n] = this_array[i];
+    r.txxxxx = Mathx.max(this.txxxxx-n,0);
+    r.sxxxxx = this.sxxxxx;
+  }
+  
+  BigInteger _drShiftTo(n,r) {
+    var this_array = this.arrayxxxxx;
+    var n_array = r.arrayxxxxx;
+    for(var i = n; i < this.txxxxx; ++i) n_array[i-n] = this_array[i];
+    return _newInst(n_array, this.amxxxxx, Mathx.max(this.txxxxx-n,0), this.sxxxxx);
   }
 
   /** r = this << n */
   void lShiftTo(n,r) {
-    var this_array = this.array;
-    var r_array = r.array;
+    var this_array = this.arrayxxxxx;
+    var r_array = r.arrayxxxxx;
     var bs = n%BI_DB;
     var cbs = BI_DB-bs;
     var bm = (1<<cbs)-1;
     int ds = n~/BI_DB;
-    var c = (this.s<<bs)&BI_DM;
+    var c = (this.sxxxxx<<bs)&BI_DM;
     var i;
-    for(i = this.t-1; i >= 0; --i) {
+    for(i = this.txxxxx-1; i >= 0; --i) {
       r_array[i+ds+1] = (this_array[i]>>cbs)|c;
       c = (this_array[i]&bm)<<bs;
     }
     for(i = ds-1; i >= 0; --i) r_array[i] = 0;
     r_array[ds] = c;
-    r.t = this.t+ds+1;
-    r.s = this.s;
+    r.txxxxx = this.txxxxx+ds+1;
+    r.sxxxxx = this.sxxxxx;
     r.clamp();
+  }
+  
+  BigInteger _lShiftTo(n,r) {
+    var this_array = this.arrayxxxxx;
+    var n_array = r.arrayxxxxx;
+    var bs = n%BI_DB;
+    var cbs = BI_DB-bs;
+    var bm = (1<<cbs)-1;
+    int ds = n~/BI_DB;
+    var c = (this.sxxxxx<<bs)&BI_DM;
+    var i;
+    for(i = this.txxxxx-1; i >= 0; --i) {
+      n_array[i+ds+1] = (this_array[i]>>cbs)|c;
+      c = (this_array[i]&bm)<<bs;
+    }
+    for(i = ds-1; i >= 0; --i) n_array[i] = 0;
+    n_array[ds] = c;
+    var n_t = this.txxxxx+ds+1;
+    var n_s = this.sxxxxx;
+    n_t = clamp(n_t, n_array, n_s);
+    return _newInst(n_array, this.amxxxxx, n_t, n_s);
   }
 
 
   /** r = this >> n */
   void rShiftTo(n,r) {
-      var this_array = this.array;
-      var r_array = r.array;
-      r.s = this.s;
+      var this_array = this.arrayxxxxx;
+      var r_array = r.arrayxxxxx;
+      r.sxxxxx = this.sxxxxx;
       var ds = n~/BI_DB;
 
-      if(ds >= this.t) {
-        r.t = 0;
+      if(ds >= this.txxxxx) {
+        r.txxxxx = 0;
         return;
       }
       var bs = n%BI_DB;
       var cbs = BI_DB-bs;
       var bm = (1<<bs)-1;
       r_array[0] = this_array[ds]>>bs;
-      for(var i = ds+1; i < this.t; ++i) {
+      for(var i = ds+1; i < this.txxxxx; ++i) {
         r_array[i-ds-1] |= (this_array[i]&bm)<<cbs;
         r_array[i-ds] = this_array[i]>>bs;
       }
-      if(bs > 0) r_array[this.t-ds-1] |= (this.s&bm)<<cbs;
-      r.t = this.t-ds;
+      if(bs > 0) r_array[this.txxxxx-ds-1] |= (this.sxxxxx&bm)<<cbs;
+      r.txxxxx = this.txxxxx-ds;
       r.clamp();
   }
 
+  BigInteger _rShiftTo(n,r) {
+      var this_array = this.arrayxxxxx;
+      var n_array = r.arrayxxxxx;;
+      var n_s = this.sxxxxx;
+      var ds = n~/BI_DB;
 
-  /** clamp off excess high words */
-  void clamp() {
-    var this_array = this.array;
-    var c = this.s&BI_DM;
+      if(ds >= this.txxxxx)
+        return _newInst(n_array, this.amxxxxx, 0, n_s);
+      var bs = n%BI_DB;
+      var cbs = BI_DB-bs;
+      var bm = (1<<bs)-1;
+      n_array[0] = this_array[ds]>>bs;
+      for(var i = ds+1; i < this.txxxxx; ++i) {
+        n_array[i-ds-1] |= (this_array[i]&bm)<<cbs;
+        n_array[i-ds] = this_array[i]>>bs;
+      }
+      if(bs > 0) n_array[this.txxxxx-ds-1] |= (this.sxxxxx&bm)<<cbs;
+      var n_t = this.txxxxx-ds;
+      n_t = clamp(n_t, n_array, n_s);
+      return _newInst(n_array, this.amxxxxx, n_t, n_s);
+  }
 
-    while(this.t > 0 && this_array[this.t-1] == c) {
-      --this.t;
+
+  /** clamp off excess high words, returns new t */
+  static int clamp(n_t, n_array, n_s) {
+    var c = n_s & BI_DM;
+    while(n_t > 0 && n_array[n_t-1] == c) {
+      --n_t;
     }
+    return n_t;
   }
 
   /** r = this - a */
   void subTo(a,r) {
-    var this_array = this.array;
-    var r_array = r.array;
-    var a_array = a.array;
+    var this_array = this.arrayxxxxx;
+    var r_array = r.arrayxxxxx;
+    var a_array = a.arrayxxxxx;
     int i = 0;
     int c = 0;
-    int m = Mathx.min(a.t, this.t);
+    int m = Mathx.min(a.txxxxx, this.txxxxx);
 
     while(i < m) {
       c += (this_array[i].toInt() - a_array[i].toInt()).toInt();
@@ -692,9 +787,9 @@ class BigInteger {
       }
     }
 
-    if(a.t < this.t) {
-      c -= a.s;
-      while(i < this.t) {
+    if(a.txxxxx < this.txxxxx) {
+      c -= a.sxxxxx;
+      while(i < this.txxxxx) {
         c += this_array[i];
         r_array[i++] = c&BI_DM;
         c >>= BI_DB;
@@ -703,10 +798,10 @@ class BigInteger {
           c = -1;
         }
       }
-      c += this.s;
+      c += this.sxxxxx;
     } else {
-      c += this.s;
-      while(i < a.t) {
+      c += this.sxxxxx;
+      while(i < a.txxxxx) {
         c -= a_array[i];
         r_array[i++] = c&BI_DM;
         c >>= BI_DB;
@@ -714,10 +809,10 @@ class BigInteger {
           c = -1;
         }
       }
-      c -= a.s;
+      c -= a.sxxxxx;
     }
 
-    r.s = (c<0) ? -1 : 0;
+    r.sxxxxx = (c<0) ? -1 : 0;
 
     if(c < -1) {
       r_array[i++] = BI_DV+c;
@@ -725,104 +820,193 @@ class BigInteger {
       r_array[i++] = c;
     }
 
-    r.t = i;
+    r.txxxxx = i;
     r.clamp();
   }
+  
+  BigInteger _subTo(a,r) {
+    var this_array = this.arrayxxxxx;
+    var n_array = r.arrayxxxxx;
+    var a_array = a.arrayxxxxx;
+    int i = 0;
+    int c = 0;
+    int m = Mathx.min(a.txxxxx, this.txxxxx);
 
-  bool _debugging = true;
-  _dump_state(a) {
-    if (_debugging) {
-      return "t=${a.t}, s=${a.s}, array = ${a.array}";
+    while(i < m) {
+      c += (this_array[i].toInt() - a_array[i].toInt()).toInt();
+      n_array[i++] = c&BI_DM;
+      c >>= BI_DB;
+      // NOTE: this is to bypass a dart2js bug
+      if (c == 4294967295) {
+        c = -1;
+      }
     }
+
+    if(a.txxxxx < this.txxxxx) {
+      c -= a.sxxxxx;
+      while(i < this.txxxxx) {
+        c += this_array[i];
+        n_array[i++] = c&BI_DM;
+        c >>= BI_DB;
+        // NOTE: this is to bypass a dart2js bug
+        if (c == 4294967295) {
+          c = -1;
+        }
+      }
+      c += this.sxxxxx;
+    } else {
+      c += this.sxxxxx;
+      while(i < a.txxxxx) {
+        c -= a_array[i];
+        n_array[i++] = c&BI_DM;
+        c >>= BI_DB;
+        if (c == 4294967295) {
+          c = -1;
+        }
+      }
+      c -= a.sxxxxx;
+    }
+
+    var n_s = (c<0) ? -1 : 0;
+
+    if(c < -1) {
+      n_array[i++] = BI_DV+c;
+    } else if(c > 0) {
+      n_array[i++] = c;
+    }
+    
+    var n_t = i;
+    n_t = clamp(n_t, n_array, n_s);
+    return _newInst(n_array, this.amxxxxx, n_t, n_s);
   }
+  
 
   /**
    * r = this * a, r != this,a (HAC 14.12)
    * [this] should be the larger one if appropriate.
    */
   void multiplyTo(a,r) {
-    var this_array = this.array;
-    var r_array = r.array;
+    var this_array = this.arrayxxxxx;
+    var r_array = r.arrayxxxxx;
     BigInteger x = this.abs();
     BigInteger y = a.abs();
-    var y_array = y.array;
-    var i = x.t;
-    r.t = i+y.t;
+    var y_array = y.arrayxxxxx;
+    var i = x.txxxxx;
+    r.txxxxx = i+y.txxxxx;
     while(--i >= 0) r_array[i] = 0;
-    for(i = 0; i < y.t; ++i) r_array[i+x.t] = x.am(0,y_array[i],r,i,0,x.t,x.array);
-    r.s = 0;
+    for(i = 0; i < y.txxxxx; ++i) r_array[i+x.txxxxx] = x.amxxxxx(0,y_array[i],r,i,0,x.txxxxx,x.arrayxxxxx);
+    r.sxxxxx = 0;
     r.clamp();
 
-    if(this.s != a.s) {
+    if(this.sxxxxx != a.sxxxxx) {
       BigInteger.ZERO.subTo(r,r);
     }
+  }
+  
+  BigInteger _multiplyTo(a,r) {
+    var this_array = this.arrayxxxxx;
+    var n_array = r.arrayxxxxx;
+    BigInteger x = this.abs();
+    BigInteger y = a.abs();
+    var y_array = y.arrayxxxxx;
+    var i = x.txxxxx;
+    var n_t = i+y.txxxxx;
+    while(--i >= 0) n_array[i] = 0;
+    for(i = 0; i < y.txxxxx; ++i) n_array[i+x.txxxxx] = x.amxxxxx(0,y_array[i],r,i,0,x.txxxxx,x.arrayxxxxx);
+    var n_s = 0;
+    n_t = clamp(n_t, n_array, n_s);
 
+    if(this.sxxxxx != a.sxxxxx) {
+      return BigInteger.ZERO._subTo(r,r);
+    }
+    return _newInst(n_array, this.amxxxxx, n_t, n_s);
   }
 
   /** r = this^2, r != this (HAC 14.16) */
   void squareTo(r) {
     var x = this.abs();
-    var x_array = x.array;
-    var r_array = r.array;
+    var x_array = x.arrayxxxxx;
+    var r_array = r.arrayxxxxx;
 
-    var i = r.t = 2*x.t;
+    var i = r.txxxxx = 2*x.txxxxx;
     while(--i >= 0) r_array[i] = 0;
-    for(i = 0; i < x.t-1; ++i) {
-      var c = x.am(i,x_array[i],r,2*i,0,1,x.array);
-      if((r_array[i+x.t]+=x.am(i+1,2*x_array[i],r,2*i+1,c,x.t-i-1,x.array)) >= BI_DV) {
-        r_array[i+x.t] -= BI_DV;
-        r_array[i+x.t+1] = 1;
+    for(i = 0; i < x.txxxxx-1; ++i) {
+      var c = x.amxxxxx(i,x_array[i],r,2*i,0,1,x.arrayxxxxx);
+      if((r_array[i+x.txxxxx]+=x.amxxxxx(i+1,2*x_array[i],r,2*i+1,c,x.txxxxx-i-1,x.arrayxxxxx)) >= BI_DV) {
+        r_array[i+x.txxxxx] -= BI_DV;
+        r_array[i+x.txxxxx+1] = 1;
       }
     }
-    if(r.t > 0) r_array[r.t-1] += x.am(i,x_array[i],r,2*i,0,1,x.array);
-    r.s = 0;
+    if(r.txxxxx > 0) r_array[r.txxxxx-1] += x.amxxxxx(i,x_array[i],r,2*i,0,1,x.arrayxxxxx);
+    r.sxxxxx = 0;
     r.clamp();
+  }
+  
+  BigInteger _squareTo(r) {
+    var x = this.abs();
+    var x_array = x.arrayxxxxx;
+    var n_array = r.arrayxxxxx;
+    
+    var i = 2*x.txxxxx;
+    var n_t = i;
+    while(--i >= 0) n_array[i] = 0;
+    for(i = 0; i < x.txxxxx-1; ++i) {
+      var c = x.amxxxxx(i,x_array[i],r,2*i,0,1,x.arrayxxxxx);
+      if((n_array[i+x.txxxxx]+=x.amxxxxx(i+1,2*x_array[i],r,2*i+1,c,x.txxxxx-i-1,x.arrayxxxxx)) >= BI_DV) {
+        n_array[i+x.txxxxx] -= BI_DV;
+        n_array[i+x.txxxxx+1] = 1;
+      }
+    }
+    if(r.txxxxx > 0) n_array[r.txxxxx-1] += x.amxxxxx(i,x_array[i],r,2*i,0,1,x.arrayxxxxx);
+    var n_s = 0;
+    n_t = clamp(n_t, n_array, n_s);
+    return _newInst(n_array, this.amxxxxx, n_t, n_s);
   }
 
   /**
    * divide this by m, quotient and remainder to q, r (HAC 14.20)
    * r != q, this != m.  q or r may be null.
    */
-  divRemTo(BigInteger m,q,BigInteger r) {
+  void divRemTo(BigInteger m,q,BigInteger r) {
     var pm = m.abs();
-    if(pm.t <= 0) return;
+    if(pm.txxxxx <= 0) return;
     var pt = this.abs();
-    if(pt.t < pm.t) {
+    if(pt.txxxxx < pm.txxxxx) {
       if(q != null) q.fromInt(0);
       if(r != null) this.copyTo(r);
       return;
     }
-    if(r == null) r = nbi();
-    var y = nbi(), ts = this.s, ms = m.s;
-    var pm_array = pm.array;
-    var nsh = BI_DB-nbits(pm_array[pm.t-1]);  // normalize modulus
+    if(r == null) r = _nbi();
+    var y = _nbi(), ts = this.sxxxxx, ms = m.sxxxxx;
+    var pm_array = pm.arrayxxxxx;
+    var nsh = BI_DB-nbits(pm_array[pm.txxxxx-1]);  // normalize modulus
     if(nsh > 0) { pm.lShiftTo(nsh,y); pt.lShiftTo(nsh,r); }
     else { pm.copyTo(y); pt.copyTo(r); }
-    var ys = y.t;
+    var ys = y.txxxxx;
 
-    var y_array = y.array;
+    var y_array = y.arrayxxxxx;
     var y0 = y_array[ys-1];
     if(y0 == 0) return;
     var yt = y0*(1<<BI_F1)+((ys>1)?y_array[ys-2]>>BI_F2:0);
     var d1 = BI_FV/yt, d2 = (1<<BI_F1)/yt, e = 1<<BI_F2;
-    var i = r.t,
+    var i = r.txxxxx,
         j = i-ys;
-    BigInteger t = (q==null) ?nbi() : q;
+    BigInteger t = (q==null) ?_nbi() : q;
 
     y.dlShiftTo(j,t);
 
-    var r_array = r.array;
+    var r_array = r.arrayxxxxx;
     if(r.compareTo(t) >= 0) {
-      r_array[r.t++] = 1;
+      r_array[r.txxxxx++] = 1;
       r.subTo(t,r);
     }
     BigInteger.ONE.dlShiftTo(ys,t);
     t.subTo(y,y); // "negative" y so we can replace sub with am later
-    while(y.t < ys) y_array[y.t++] = 0;
+    while(y.txxxxx < ys) y_array[y.txxxxx++] = 0;
     while(--j >= 0) {
       // Estimate quotient digit
       var qd = (r_array[--i]==y0)?BI_DM:(r_array[i]*d1+(r_array[i-1]+e)*d2).floor();
-      if((r_array[i]+=y.am(0,qd,r,j,0,ys,y.array)) < qd) {  // Try it out
+      if((r_array[i]+=y.amxxxxx(0,qd,r,j,0,ys,y.arrayxxxxx)) < qd) {  // Try it out
         y.dlShiftTo(j,t);
         r.subTo(t,r);
         while(r_array[i] < --qd) r.subTo(t,r);
@@ -832,17 +1016,100 @@ class BigInteger {
       r.drShiftTo(ys,q);
       if(ts != ms) BigInteger.ZERO.subTo(q,q);
     }
-    r.t = ys;
+    r.txxxxx = ys;
     r.clamp();
     if(nsh > 0) r.rShiftTo(nsh,r);  // Denormalize remainder
     if(ts < 0) BigInteger.ZERO.subTo(r,r);
   }
+  
+  // returns [q,r] with q = quotient and r = remainder
+  _QuotRem _divRemTo(BigInteger m,q,BigInteger r) {
+    var pm = m.abs();
+    if(pm.txxxxx <= 0) 
+      return new _QuotRem(q,r);
+    var pt = this.abs();
+    if(pt.txxxxx < pm.txxxxx) {
+      if(q != null) {
+        q = new BigInteger.fromInt(0);
+        return new _QuotRem(q,r);
+      }
+      if(r != null)
+        r = this.copy();
+      return new _QuotRem(q,r);
+    }
+    if(r == null) r = _nbi();
+    var y = _nbi(), ts = this.sxxxxx, ms = m.sxxxxx;
+    var pm_array = pm.arrayxxxxx;
+    var nsh = BI_DB-nbits(pm_array[pm.txxxxx-1]);  // normalize modulus
+    if(nsh > 0) {
+      y = pm._lShiftTo(nsh,y); 
+      r = pt._lShiftTo(nsh,r); 
+    } else { 
+      y = pm.copy(); 
+      r = pt.copy(); 
+    }
+    var ys = y.txxxxx;
+
+    var y_array = y.arrayxxxxx;
+    var y0 = y_array[ys-1];
+    if(y0 == 0) {
+      return new _QuotRem(q,r);
+    }
+    var yt = y0*(1<<BI_F1)+((ys>1)?y_array[ys-2]>>BI_F2:0);
+    var d1 = BI_FV/yt, d2 = (1<<BI_F1)/yt, e = 1<<BI_F2;
+    var i = r.txxxxx,
+        j = i-ys;
+    BigInteger t = (q==null) ? _nbi() : q;
+
+    t = y._dlShiftTo(j,t);
+
+    var r_array = r.arrayxxxxx;
+    if(r.compareTo(t) >= 0) {
+      var r_t = r.txxxxx;
+      r_array[r_t++] = 1;
+      var new_r = _newInst(r_array, r.amxxxxx, r_t, r.sxxxxx);
+      r = new_r._subTo(t,new_r);
+    }
+    t = BigInteger.ONE._dlShiftTo(ys,t);
+    y = t._subTo(y,y); // "negative" y so we can replace sub with am later
+    var y_t = y.txxxxx;
+    while(y_t < ys) y_array[y_t++] = 0;
+    y = _newInst(y.arrayxxxxx, y.amxxxxx, y_t, y.sxxxxx);
+    while(--j >= 0) {
+      // Estimate quotient digit
+      var qd = (r_array[--i]==y0)?BI_DM:(r_array[i]*d1+(r_array[i-1]+e)*d2).floor();
+      if((r_array[i]+=y.amxxxxx(0,qd,r,j,0,ys,y.arrayxxxxx)) < qd) {  // Try it out
+        t = y._dlShiftTo(j,t);
+        r = r._subTo(t,r);
+        while(r_array[i] < --qd) r = r._subTo(t,r);
+      }
+    }
+    if(q != null) {
+      q = r._drShiftTo(ys,q);
+      if(ts != ms) q = BigInteger.ZERO._subTo(q,q);
+    }
+    var r_t = ys;
+    r_t = clamp(r_t, r.arrayxxxxx, r.sxxxxx);
+    if(nsh > 0) r = r._rShiftTo(nsh,r);  // Denormalize remainder
+    if(ts < 0) r = BigInteger.ZERO._subTo(r,r);
+    var new_q = _newInst(q.arrayxxxxx, q.amxxxxx, q.txxxxx, q.sxxxxx);
+    var new_r = _newInst(r.arrayxxxxx, r.amxxxxx, r_t, r.sxxxxx);
+    return new _QuotRem(new_q,new_r);
+  }
+  
 
   /** this mod a */
   mod(a) {
-    var r = nbi();
+    var r = _nbi();
     this.abs().divRemTo(a,null,r);
-    if(this.s < 0 && r.compareTo(BigInteger.ZERO) > 0) a.subTo(r,r);
+    if(this.sxxxxx < 0 && r.compareTo(BigInteger.ZERO) > 0) a.subTo(r,r);
+    return r;
+  }
+  
+  BigInteger _mod(a) {
+    var r = _nbi();
+    r = this.abs()._divRemTo(a,null,r).r;
+    if(this.sxxxxx < 0 && r.compareTo(BigInteger.ZERO) > 0) r = a._subTo(r,r);
     return r;
   }
 
@@ -859,8 +1126,24 @@ class BigInteger {
    * JS multiply "overflows" differently from C/C++, so care is needed here.
    */
   invDigit() {
-    var this_array = this.array;
-    if(this.t < 1) return 0;
+    var this_array = this.arrayxxxxx;
+    if(this.txxxxx < 1) return 0;
+    var x = this_array[0];
+    if((x&1) == 0) return 0;
+    var y = x&3;    // y == 1/x mod 2^2
+    y = (y*(2-(x&0xf)*y))&0xf;  // y == 1/x mod 2^4
+    y = (y*(2-(x&0xff)*y))&0xff;  // y == 1/x mod 2^8
+    y = (y*(2-(((x&0xffff)*y)&0xffff)))&0xffff; // y == 1/x mod 2^16
+    // last step - calculate inverse mod DV directly;
+    // assumes 16 < DB <= 32 and assumes ability to handle 48-bit ints
+    y = (y*(2-x*y%BI_DV))%BI_DV;    // y == 1/x mod 2^dbits
+    // we really want the negative inverse, and -DV < y < DV
+    return (y>0)?BI_DV-y:-y;
+  }
+  
+  int _invDigit() {
+    var this_array = this.arrayxxxxx;
+    if(this.txxxxx < 1) return 0;
     var x = this_array[0];
     if((x&1) == 0) return 0;
     var y = x&3;    // y == 1/x mod 2^2
@@ -876,18 +1159,18 @@ class BigInteger {
 
   /** true iff [this] is even */
   isEven() {
-    var this_array = this.array;
-    return ((this.t>0)?(this_array[0]&1):this.s) == 0;
+    var this_array = this.arrayxxxxx;
+    return ((this.txxxxx>0)?(this_array[0]&1):this.sxxxxx) == 0;
   }
 
-  /** true iff [this] is off */
+  /** true iff [this] is odd */
   isOdd() => !isEven();
 
   /** this^e, e < 2^32, doing sqr and mul with "r" (HAC 14.79) */
   BigInteger exp(int e, z) { // TODO: z is one of the reduction algorithms, pass interface class
     if(e > 0xffffffff || e < 1) return BigInteger.ONE;
-    BigInteger r = nbi();
-    BigInteger r2 = nbi();
+    BigInteger r = _nbi();
+    BigInteger r2 = _nbi();
 
     BigInteger  g = z.convert(this);
     int i = nbits(e)-1;
@@ -916,34 +1199,34 @@ class BigInteger {
 
   /** clone */
   clone() {
-    var r = nbi();
+    var r = _nbi();
     this.copyTo(r);
     return r;
   }
 
   /** return value as integer */
   int intValue() {
-    var this_array = this.array;
-    if(this.s < 0) {
-      if(this.t == 1) { return this_array[0]-BI_DV;
-      } else if(this.t == 0) return -1;
+    var this_array = this.arrayxxxxx;
+    if(this.sxxxxx < 0) {
+      if(this.txxxxx == 1) { return this_array[0]-BI_DV;
+      } else if(this.txxxxx == 0) return -1;
     }
-    else if(this.t == 1) { return this_array[0];
-    } else if(this.t == 0) return 0;
+    else if(this.txxxxx == 1) { return this_array[0];
+    } else if(this.txxxxx == 0) return 0;
     // assumes 16 < DB < 32
     return ((this_array[1]&((1<<(32-BI_DB))-1))<<BI_DB)|this_array[0];
   }
 
   /** return value as byte */
   byteValue() {
-    var this_array = this.array;
-    return (this.t==0)?this.s:(this_array[0]<<24)>>24;
+    var this_array = this.arrayxxxxx;
+    return (this.txxxxx==0)?this.sxxxxx:(this_array[0]<<24)>>24;
   }
 
   /** return value as short (assumes DB>=16) */
   shortValue() {
-    var this_array = this.array;
-    return (this.t==0)?this.s:(this_array[0]<<16)>>16;
+    var this_array = this.arrayxxxxx;
+    return (this.txxxxx==0)?this.sxxxxx:(this_array[0]<<16)>>16;
   }
 
   /** return x s.t. r^x < DV */
@@ -953,10 +1236,10 @@ class BigInteger {
 
   /** 0 if this == 0, 1 if this > 0 */
   int signum() {
-    var this_array = this.array;
-    if(this.s < 0) {
+    var this_array = this.arrayxxxxx;
+    if(this.sxxxxx < 0) {
       return -1;
-    } else if(this.t <= 0 || (this.t == 1 && this_array[0] <= 0)) {
+    } else if(this.txxxxx <= 0 || (this.txxxxx == 1 && this_array[0] <= 0)) {
       return 0;
     } else {
       return 1;
@@ -969,7 +1252,7 @@ class BigInteger {
     if(this.signum() == 0 || b < 2 || b > 36) return "0";
     var cs = this.chunkSize(b);
     int a = Mathx.pow(b,cs);
-    var d = nbv(a), y = nbi(), z = nbi(), r = "";
+    var d = nbv(a), y = _nbi(), z = _nbi(), r = "";
     this.divRemTo(d,y,z);
     while(y.signum() > 0) {
       r = "${(a+z.intValue()).toInt().toRadixString(b).substring(1)}${r}";
@@ -981,7 +1264,8 @@ class BigInteger {
 
 
   /** convert from radix string */
-  void fromRadix(s,b) {
+  //TODO
+  static BigInteger fromRadix(s,b) {
     this.fromInt(0);
 
     if(b == null) b = 10;
@@ -1065,14 +1349,14 @@ class BigInteger {
    * convert to bigendian byte array [List]
    */
   List<int> toByteArray() {
-    var this_array = this.array;
-    var i = this.t;
+    var this_array = this.arrayxxxxx;
+    var i = this.txxxxx;
     JSArray<int> r = new JSArray<int>();
-    r[0] = this.s;
+    r[0] = this.sxxxxx;
     var p = BI_DB-(i*BI_DB)%8, d, k = 0;
     if(i-- > 0) {
-      if(p < BI_DB && (d = this_array[i]>>p) != (this.s&BI_DM)>>p) {
-        r[k++] = d|(this.s<<(BI_DB-p));
+      if(p < BI_DB && (d = this_array[i]>>p) != (this.sxxxxx&BI_DM)>>p) {
+        r[k++] = d|(this.sxxxxx<<(BI_DB-p));
       }
       while(i >= 0) {
         if(p < 8) {
@@ -1084,8 +1368,8 @@ class BigInteger {
           if(p <= 0) { p += BI_DB; --i; }
         }
         if((d&0x80) != 0) d |= -256;
-        if(k == 0 && (this.s&0x80) != (d&0x80)) ++k;
-        if(k > 0 || d != this.s) r[k++] = d;
+        if(k == 0 && (this.sxxxxx&0x80) != (d&0x80)) ++k;
+        if(k > 0 || d != this.sxxxxx) r[k++] = d;
       }
     }
     return r.data;
@@ -1106,22 +1390,22 @@ class BigInteger {
 
   /** r = this op a (bitwise) */
   void bitwiseTo(BigInteger a, Function op, BigInteger r) {
-    var this_array = this.array;
-    var a_array    = a.array;
-    var r_array    = r.array;
-    var i, f, m = Mathx.min(a.t,this.t);
+    var this_array = this.arrayxxxxx;
+    var a_array    = a.arrayxxxxx;
+    var r_array    = r.arrayxxxxx;
+    var i, f, m = Mathx.min(a.txxxxx,this.txxxxx);
     for(i = 0; i < m; ++i) r_array[i] = op(this_array[i],a_array[i]);
-    if(a.t < this.t) {
-      f = a.s&BI_DM;
-      for(i = m; i < this.t; ++i) r_array[i] = op(this_array[i],f);
-      r.t = this.t;
+    if(a.txxxxx < this.txxxxx) {
+      f = a.sxxxxx&BI_DM;
+      for(i = m; i < this.txxxxx; ++i) r_array[i] = op(this_array[i],f);
+      r.txxxxx = this.txxxxx;
     }
     else {
-      f = this.s&BI_DM;
-      for(i = m; i < a.t; ++i) r_array[i] = op(f,a_array[i]);
-      r.t = a.t;
+      f = this.sxxxxx&BI_DM;
+      for(i = m; i < a.txxxxx; ++i) r_array[i] = op(f,a_array[i]);
+      r.txxxxx = a.txxxxx;
     }
-    r.s = op(this.s,a.s);
+    r.sxxxxx = op(this.sxxxxx,a.sxxxxx);
     r.clamp();
   }
 
@@ -1129,7 +1413,7 @@ class BigInteger {
   /** this & a */
   op_and(x,y) { return x&y; }
   and(a) {
-    var r = nbi();
+    var r = _nbi();
     this.bitwiseTo(a,op_and,r);
     return r;
   }
@@ -1140,7 +1424,7 @@ class BigInteger {
   }
 
   or(a) {
-    var r = nbi();
+    var r = _nbi();
     this.bitwiseTo(a,op_or,r);
     return r;
   }
@@ -1148,7 +1432,7 @@ class BigInteger {
   /** this ^ a */
   op_xor(x,y) { return x^y; }
   xor(a) {
-    var r = nbi();
+    var r = _nbi();
     this.bitwiseTo(a,op_xor,r);
     return r;
   }
@@ -1156,30 +1440,30 @@ class BigInteger {
   /** this & ~a */
   op_andnot(x,y) { return x&~y; }
   andNot(a) {
-    var r = nbi();
+    var r = _nbi();
     this.bitwiseTo(a,op_andnot,r);
     return r;
   }
 
   /** ~this */
   not() {
-    var this_array = this.array;
-    var r = nbi();
-    var r_array = r.array;
+    var this_array = this.arrayxxxxx;
+    var r = _nbi();
+    var r_array = r.arrayxxxxx;
 
-    for(var i = 0; i < this.t; ++i) {
+    for(var i = 0; i < this.txxxxx; ++i) {
       r_array[i] = BI_DM & ~this_array[i];
     }
 
-    r.t = this.t;
-    r.s = ~this.s;
+    r.txxxxx = this.txxxxx;
+    r.sxxxxx = ~this.sxxxxx;
     return r;
   }
 
 
   /** this << n */
   shiftLeft(n) {
-    var r = nbi();
+    var r = _nbi();
     if(n < 0) {
       this.rShiftTo(-n,r);
     } else {
@@ -1190,7 +1474,7 @@ class BigInteger {
 
   /** this >> n */
   shiftRight(n) {
-    var r = nbi();
+    var r = _nbi();
     if(n < 0) {
       this.lShiftTo(-n,r);
     } else {
@@ -1213,10 +1497,10 @@ class BigInteger {
 
   /** returns index of lowest 1-bit (or -1 if none) */
   getLowestSetBit() {
-    var this_array = this.array;
-    for(var i = 0; i < this.t; ++i)
+    var this_array = this.arrayxxxxx;
+    for(var i = 0; i < this.txxxxx; ++i)
       if(this_array[i] != 0) return i*BI_DB+lbit(this_array[i]);
-    if(this.s < 0) return this.t*BI_DB;
+    if(this.sxxxxx < 0) return this.txxxxx*BI_DB;
     return -1;
   }
 
@@ -1231,17 +1515,17 @@ class BigInteger {
 
   /** return number of set bits */
   bitCount() {
-    var this_array = this.array;
-    var r = 0, x = this.s&BI_DM;
-    for(var i = 0; i < this.t; ++i) r += cbit(this_array[i]^x);
+    var this_array = this.arrayxxxxx;
+    var r = 0, x = this.sxxxxx&BI_DM;
+    for(var i = 0; i < this.txxxxx; ++i) r += cbit(this_array[i]^x);
     return r;
   }
 
   /** true iff nth bit is set */
   testBit(n) {
-    var this_array = this.array;
+    var this_array = this.arrayxxxxx;
     int j = n~/BI_DB;
-    if(j >= this.t) return(this.s!=0);
+    if(j >= this.txxxxx) return(this.sxxxxx!=0);
     return((this_array[j]&(1<<(n%BI_DB)))!=0);
   }
 
@@ -1263,71 +1547,71 @@ class BigInteger {
 
   /** r = this + a */
   addTo(a,r) {
-    var this_array = this.array;
-    var a_array = a.array;
-    var r_array = r.array;
-    var i = 0, c = 0, m = Mathx.min(a.t,this.t);
+    var this_array = this.arrayxxxxx;
+    var a_array = a.arrayxxxxx;
+    var r_array = r.arrayxxxxx;
+    var i = 0, c = 0, m = Mathx.min(a.txxxxx,this.txxxxx);
     while(i < m) {
       c += this_array[i]+a_array[i];
       r_array[i++] = c&BI_DM;
       c >>= BI_DB;
     }
-    if(a.t < this.t) {
-      c += a.s;
-      while(i < this.t) {
+    if(a.txxxxx < this.txxxxx) {
+      c += a.sxxxxx;
+      while(i < this.txxxxx) {
         c += this_array[i];
         r_array[i++] = c&BI_DM;
         c >>= BI_DB;
       }
-      c += this.s;
+      c += this.sxxxxx;
     }
     else {
-      c += this.s;
-      while(i < a.t) {
+      c += this.sxxxxx;
+      while(i < a.txxxxx) {
         c += a_array[i];
         r_array[i++] = c&BI_DM;
         c >>= BI_DB;
       }
-      c += a.s;
+      c += a.sxxxxx;
     }
-    r.s = (c<0)?-1:0;
+    r.sxxxxx = (c<0)?-1:0;
     if(c > 0) { r_array[i++] = c;
     } else if(c < -1) r_array[i++] = BI_DV+c;
-    r.t = i;
+    r.txxxxx = i;
     r.clamp();
   }
 
   /** this + a */
   BigInteger add(a) {
-    var r = nbi();
+    var r = _nbi();
     this.addTo(a,r);
     return r;
   }
 
   /** this - a */
   BigInteger subtract(a) {
-    var r = nbi();
+    var r = _nbi();
     this.subTo(a,r);
     return r;
   }
 
   /** this * a */
   BigInteger multiply(a) {
-    var r = nbi();
+    var r = _nbi();
     this.multiplyTo(a,r);
     return r;
   }
 
   /** this / a */
   BigInteger divide(a) {
-    var r = nbi();
+    var r = _nbi();
     this.divRemTo(a,r,null);
     return r;
   }
 
   /** this % a */
   BigInteger remainder(BigInteger a) {
-    BigInteger r = nbi();
+    BigInteger r = _nbi();
     this.divRemTo(a,null,r);
     return (r.signum()>=0) ? r : (r+a);
   }
@@ -1337,7 +1621,7 @@ class BigInteger {
    * [1] = this%a
    */
   Map<int, BigInteger> divideAndRemainder(a) {
-    var q = nbi(), r = nbi();
+    var q = _nbi(), r = _nbi();
     this.divRemTo(a,q,r);
     //return new Array(q,r);
     Map ret_m = new Map();
@@ -1348,20 +1632,20 @@ class BigInteger {
 
   /** this *= n, this >= 0, 1 < n < [BI_DV] */
   dMultiply(n) {
-    var this_array = this.array;
-    this_array[this.t] = this.am(0,n-1,this,0,0,this.t,this.array);
-    ++this.t;
+    var this_array = this.arrayxxxxx;
+    this_array[this.txxxxx] = this.amxxxxx(0,n-1,this,0,0,this.txxxxx,this.arrayxxxxx);
+    ++this.txxxxx;
     this.clamp();
   }
 
   /** this += n << w words, this >= 0 */
   dAddOffset(n,w) {
-    var this_array = this.array;
-    while(this.t <= w) this_array[this.t++] = 0;
+    var this_array = this.arrayxxxxx;
+    while(this.txxxxx <= w) this_array[this.txxxxx++] = 0;
     this_array[w] += n;
     while(this_array[w] >= BI_DV) {
       this_array[w] -= BI_DV;
-      if(++w >= this.t) this_array[this.t++] = 0;
+      if(++w >= this.txxxxx) this_array[this.txxxxx++] = 0;
       ++this_array[w];
     }
   }
@@ -1377,15 +1661,15 @@ class BigInteger {
    * "this" should be the larger one if appropriate.
    */
   multiplyLowerTo(a,n,r) {
-    var r_array = r.array;
-    var a_array = a.array;
-    var i = Mathx.min(this.t+a.t,n);
-    r.s = 0; // assumes a,this >= 0
-    r.t = i;
+    var r_array = r.arrayxxxxx;
+    var a_array = a.arrayxxxxx;
+    var i = Mathx.min(this.txxxxx+a.txxxxx,n);
+    r.sxxxxx = 0; // assumes a,this >= 0
+    r.txxxxx = i;
     while(i > 0) r_array[--i] = 0;
     var j;
-    for(j = r.t-this.t; i < j; ++i) r_array[i+this.t] = this.am(0,a_array[i],r,i,0,this.t,this.array);
-    for(j = Mathx.min(a.t,n); i < j; ++i) this.am(0,a_array[i],r,i,0,n-i,this.array);
+    for(j = r.txxxxx-this.txxxxx; i < j; ++i) r_array[i+this.txxxxx] = this.amxxxxx(0,a_array[i],r,i,0,this.txxxxx,this.arrayxxxxx);
+    for(j = Mathx.min(a.txxxxx,n); i < j; ++i) this.amxxxxx(0,a_array[i],r,i,0,n-i,this.arrayxxxxx);
     r.clamp();
   }
 
@@ -1394,14 +1678,14 @@ class BigInteger {
    * "this" should be the larger one if appropriate.
    */
   multiplyUpperTo(a,n,r) {
-    var r_array = r.array;
-    var a_array = a.array;
+    var r_array = r.arrayxxxxx;
+    var a_array = a.arrayxxxxx;
     --n;
-    var i = r.t = this.t+a.t-n;
-    r.s = 0; // assumes a,this >= 0
+    var i = r.txxxxx = this.txxxxx+a.txxxxx-n;
+    r.sxxxxx = 0; // assumes a,this >= 0
     while(--i >= 0) r_array[i] = 0;
-    for(i = Mathx.max(n-this.t,0); i < a.t; ++i) {
-      r_array[this.t+i-n] = this.am(n-i,a_array[i],r,0,0,this.t+i-n,this.array);
+    for(i = Mathx.max(n-this.txxxxx,0); i < a.txxxxx; ++i) {
+      r_array[this.txxxxx+i-n] = this.amxxxxx(n-i,a_array[i],r,0,0,this.txxxxx+i-n,this.arrayxxxxx);
     }
     r.clamp();
     r.drShiftTo(1,r);
@@ -1411,7 +1695,7 @@ class BigInteger {
   /** this^e % m (HAC 14.85) */
   modPow(BigInteger e, BigInteger m) {
     // TODO: need to create interface for the reduction algorithms
-    var e_array = e.array;
+    var e_array = e.arrayxxxxx;
     var i = e.bitLength(), k, r = nbv(1), z;
     if(i <= 0) { return r;
     } else if(i < 18) { k = 1;
@@ -1433,16 +1717,16 @@ class BigInteger {
     var g = new Map(), n = 3, k1 = k-1, km = (1<<k)-1;
     g[1] = z.convert(this);
     if(k > 1) {
-      var g2 = nbi();
+      var g2 = _nbi();
       z.sqrTo(g[1],g2);
       while(n <= km) {
-        g[n] = nbi();
+        g[n] = _nbi();
         z.mulTo(g2,g[n-2],g[n]);
         n += 2;
       }
     }
 
-    var j = e.t-1, w, is1 = true, r2 = nbi(), t;
+    var j = e.txxxxx-1, w, is1 = true, r2 = _nbi(), t;
     i = nbits(e_array[j])-1;
     while(j >= 0) {
       if(i >= k1) { w = (e_array[j]>>(i-k1))&km;
@@ -1474,8 +1758,8 @@ class BigInteger {
 
   /** gcd(this,a) (HAC 14.54) */
   gcd(a) {
-    var x = (this.s<0)?this.negate_op():this.clone();
-    var y = (a.s<0)?a.negate_op():a.clone();
+    var x = (this.sxxxxx<0)?this.negate_op():this.clone();
+    var y = (a.sxxxxx<0)?a.negate_op():a.clone();
     if(x.compareTo(y) < 0) { var t = x; x = y; y = t; }
     var i = x.getLowestSetBit(), g = y.getLowestSetBit();
     if(g < 0) return x;
@@ -1502,12 +1786,12 @@ class BigInteger {
 
   /** this % n, n < 2^26 */
   int modInt(int n) {
-    var this_array = this.array;
+    var this_array = this.arrayxxxxx;
     if(n <= 0) return 0;
-    var d = BI_DV%n, r = (this.s<0)?n-1:0;
-    if(this.t > 0) {
+    var d = BI_DV%n, r = (this.sxxxxx<0)?n-1:0;
+    if(this.txxxxx > 0) {
       if(d == 0) { r = this_array[0]%n;
-      } else { for(var i = this.t-1; i >= 0; --i) r = (d*r+this_array[i])%n;
+      } else { for(var i = this.txxxxx-1; i >= 0; --i) r = (d*r+this_array[i])%n;
     }
       }
     return r;
@@ -1562,8 +1846,8 @@ class BigInteger {
   /** test primality with certainty >= 1-.5^t */
   bool isProbablePrime(int t) {
     var i, x = this.abs();
-    var x_array = x.array;
-    if(x.t == 1 && x_array[0] <= _lowprimes[_lowprimes.length-1]) {
+    var x_array = x.arrayxxxxx;
+    if(x.txxxxx == 1 && x_array[0] <= _lowprimes[_lowprimes.length-1]) {
       for(i = 0; i < _lowprimes.length; ++i)
         if(x_array[0] == _lowprimes[i]) return true;
       return false;
@@ -1587,7 +1871,7 @@ class BigInteger {
     var r = n1.shiftRight(k);
     t = (t+1)>>1;
     if(t > _lowprimes.length) t = _lowprimes.length;
-    var a = nbi();
+    var a = _nbi();
     for(var i = 0; i < t; ++i) {
       a.fromInt(_lowprimes[i]);
       var y = a.modPow(r,this);
