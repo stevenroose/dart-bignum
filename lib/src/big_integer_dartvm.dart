@@ -725,12 +725,12 @@ class BigIntegerDartvm implements BigInteger {
 
   /** test primality with certainty >= 1-.5^t */
   bool isProbablePrime(int t) {
-    var i,
-        x = this.abs();
-    if (data <= _lowprimes[_lowprimes.length - 1]) {
-      for (i = 0;
-          i < _lowprimes.length;
-          ++i) if (data == _lowprimes[i]) return true;
+    int i = 0;
+    BigIntegerDartvm x = this.abs();
+
+    if (x <= _lowprimes[_lowprimes.length - 1]) {
+      for (i = 0; i < _lowprimes.length; ++i)
+        if (x == _lowprimes[i]) return true;
       return false;
     }
     if (x.isEven()) return false;
